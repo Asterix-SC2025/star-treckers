@@ -7,8 +7,13 @@ import time
 from star_processing import process_star_image, capture_image 
 from quaternion_calculations import propagate_orientation , quat_to_euler
 import star_processing
+from bno055_calibration.bno055_calibration import run_calibration
 
-# from imu_readings import get_quaternion , calibrate
+# automatically calibrate IMU
+run_calibration()
+
+
+# from imu_readings import get_quaternion
 DEFAULT_IMAGE_PATH = Path(__file__).parent / "image_pipeline" / "starfield.png"
 
 def main(use_camera=False, image_path=DEFAULT_IMAGE_PATH):
@@ -53,5 +58,3 @@ if __name__ == "__main__":
           main(use_camera=True)
      else:
           main(use_camera=False)
-
-     
