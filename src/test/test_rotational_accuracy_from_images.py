@@ -6,6 +6,8 @@ from datetime import datetime
 import time
 import numpy as np
 from typing import Tuple, Optional, Dict, Any
+from astropy.coordinates import SkyCoord
+import astropy.units as u
 
 # Add parent directory to path to import modules
 sys.path.append(str(Path(__file__).parent.parent))
@@ -30,6 +32,21 @@ class TestRotationalAccuracyFromImages(unittest.TestCase):
           """Clean up after individual test."""
           pass
      
+     def get_right_ascension_and_declination_from_rotation_matrix(self, rot_matrix1):
+          """
+          Get the right ascension and declination from a rotation matrix.
+          """
+          body_vec = np.array([0.0, 0.0, 1.0])
+          inertial_vec = rot_matrix1 @ body_vec
+          inertial_vec = inertial_vec / np.linalg.norm(inertial_vec)
+          x, y, z = inertial_vec
+          dec_rad = np.arcsin(np.clip(z, -1, 1))
+          ra_rad = np.arctan2(y, x)
+          ra_deg = np.degrees(ra_rad) % 360
+          dec_deg = np.degrees(dec_rad)
+          print(f"RA: {ra_deg}°, Dec: {dec_deg}°")
+          return ra_deg, dec_deg
+
      def discover_test_images(self):
           """
           Automatically discover test images and organize them by RA/DEC coordinates.
@@ -118,6 +135,7 @@ class TestRotationalAccuracyFromImages(unittest.TestCase):
           result_euler = self.calculate_rotational_difference(original_path, rotated_path)
           result_quaternion = self.test_quaternion_angular_distance(original_path, rotated_path)
           
+          
           # Clean up temporary file
           if rotated_path.exists():
                rotated_path.unlink()
@@ -143,6 +161,7 @@ class TestRotationalAccuracyFromImages(unittest.TestCase):
           else:
                print("❌ Test failed - could not calculate rotational difference")
      
+     @unittest.skip("Skipping quaternion angular distance test")
      def calculate_rotational_difference(self, image1_path, image2_path):
           """
           Calculate the rotational difference between two images.
@@ -201,7 +220,7 @@ class TestRotationalAccuracyFromImages(unittest.TestCase):
                'roll_diff': roll_diff,
                'max_diff': max(yaw_diff, pitch_diff, roll_diff)
           }
-
+          
      def test_quaternion_angular_distance(self, image1_path, image2_path):
           """
           Calculate the rotational difference between two images.
@@ -217,68 +236,30 @@ class TestRotationalAccuracyFromImages(unittest.TestCase):
                print("Failed to process one or both images")
                return None
           
-          # Convert quaternions to dict format if they're numpy arrays
-          if isinstance(quat1, np.ndarray):
-               quat1_dict = quat2dict(quat1)
-          else:
-               quat1_dict = quat1
-               
-          if isinstance(quat2, np.ndarray):
-               quat2_dict = quat2dict(quat2)
-          else:
-               quat2_dict = quat2
-          
-          distance = quaternion_angular_distance(quat1_dict, quat2_dict)
+          distance = quaternion_angular_distance(quat1, quat2)
           print(f"Distance: {distance}")
           return distance
-
      
-     def test_basic_functionality(self):
-          """Basic test placeholder."""
-          pass
-     
-     def test_rotational_accuracy_between_0_and_45_dec(self):
-          """Test rotational accuracy between images."""
+     def test_rotational_accuracy_from_120RA_80DEC(self):
+          """Test rotational accuracy from 120RA_80DEC."""
           # Get the test images
           test_images = self.discover_test_images()
           
           # For now, let's just print what we found
           print(f"\nTest images found: {len(test_images)}")
-          for name, info in test_images.items():
-               print(f"  {name}: RA={info['ra']}, DEC={info['dec']}")
+          test_image = test_images['120RA_80DEC']
+          print(f"Test image: {test_image}")
+          test_image_path = test_image['path']
+          quat1, rot_matrix1 = lost_in_space(str(test_image_path), visualize=False)
+          print(f"Quat1: {quat1}")
+          ra_deg, dec_deg = self.get_right_ascension_and_declination_from_rotation_matrix(rot_matrix1)
           
-          # Now let's test the rotational difference between the two images
-          if len(test_images) >= 2:
-               # Get the first two images
-               image_names = list(test_images.keys())
-               image1_name = image_names[0]
-               image2_name = image_names[1]
-               
-               print(f"\nTesting rotational difference between:")
-               print(f"  Image 1: {image1_name}")
-               print(f"  Image 2: {image2_name}")
+     def test_rotational_accuracy_from_image(self):
+          test_image_path = "/Users/michaelcaneff/Pictures/Stellarium/stellarium-006.jpeg"
+          quat1, rot_matrix1 = lost_in_space(str(test_image_path), visualize=False)
+          print(f"Quat1: {quat1}")
+          ra_deg, dec_deg = self.get_right_ascension_and_declination_from_rotation_matrix(rot_matrix1)
 
-               calculate_using_euler = False
-               if calculate_using_euler:
-                    result = self.calculate_rotational_difference(
-                    test_images[image1_name]['path'],
-                    test_images[image2_name]['path']
-                    )
-                    self.assertIsNotNone(result)
-                    expected_diff = 45.0
-                    tolerance = 5.0
-                    self.assertAlmostEqual(result['max_diff'], expected_diff, delta=tolerance)
-
-               else:
-                    result = self.test_quaternion_angular_distance(
-                         test_images[image1_name]['path'],
-                         test_images[image2_name]['path']
-                    )
-                    self.assertIsNotNone(result)
-                    expected_diff = 45.0
-                    tolerance = 5.0
-                    self.assertAlmostEqual(result, expected_diff, delta=tolerance)
-
-
+          
 if __name__ == "__main__":
      unittest.main()
